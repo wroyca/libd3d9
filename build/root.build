@@ -1,0 +1,27 @@
+cxx.std = latest
+
+using cxx
+
+hxx{*}: extension = hxx
+ixx{*}: extension = ixx
+txx{*}: extension = txx
+cxx{*}: extension = cxx
+
+if ($cxx.target.system == 'win32-msvc')
+  cxx.poptions += -D_AMD64_
+
+if ($cxx.target.system == 'win32-msvc')
+  cxx.poptions += -DNOMINMAX
+
+if ($cxx.target.system == 'win32-msvc')
+  cxx.poptions += -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS
+
+if ($cxx.target.system == 'win32-msvc')
+  cxx.poptions += -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00
+
+if ($cxx.target.system == 'win32-msvc')
+  cxx.coptions += /wd4251 /wd4275 /wd4800
+
+# The test target for cross-testing (running tests under Wine, etc).
+#
+test.target = $cxx.target

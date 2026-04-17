@@ -1,0 +1,46 @@
+intf_libs = # Interface dependencies.
+impl_libs = # Implementation dependencies.
+
+lib{d3d9}: {hxx ixx txx cxx}{** -version} \
+           {hxx            }{    version} \
+           $impl_libs $intf_libs
+
+# Version header generation.
+#
+hxx{version}: in{version} $src_root/manifest
+
+# Build options.
+#
+cxx.poptions =+ "-I$out_root" "-I$src_root"
+
+obja{*}: cxx.poptions += -DLIBD3D9_STATIC_BUILD
+objs{*}: cxx.poptions += -DLIBD3D9_SHARED_BUILD
+
+# Export options.
+#
+lib{d3d9}:
+{
+  cxx.export.poptions = "-I$out_root" "-I$src_root"
+  cxx.export.libs = $intf_libs
+}
+
+liba{d3d9}: cxx.export.poptions += -DLIBD3D9_STATIC
+libs{d3d9}: cxx.export.poptions += -DLIBD3D9_SHARED
+
+# For pre-releases use the complete version to make sure they cannot
+# be used in place of another pre-release or the final version. See
+# the version module for details on the version.* variable values.
+#
+if $version.pre_release
+  lib{d3d9}: bin.lib.version = "-$version.project_id"
+else
+  lib{d3d9}: bin.lib.version = "-$version.major.$version.minor"
+
+# Install into the libd3d9/ subdirectory of, say, /usr/include/
+# recreating subdirectories.
+#
+{hxx ixx txx}{*}:
+{
+  install         = include/libd3d9/
+  install.subdirs = true
+}
