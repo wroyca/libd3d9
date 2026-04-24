@@ -1,0 +1,6 @@
+$out_root/
+{
+  include libd3d9/
+}
+
+export $out_root/libd3d9/$import.target
