@@ -2,9 +2,10 @@
 
 namespace d3d9
 {
-  // Interception points wired into the D3D9 device vtable.
+  // Interception points wired into the D3D9 device vtable and the D3D9
+  // factory vtable.
   //
-  // Each enumerator represents a event. The exact dispatch semantics (for
+  // Each enumerator represents an event. The exact dispatch semantics (for
   // example, whether we fire before or after delegating to the original
   // function) and the corresponding callback signatures are defined in the
   // event traits.
@@ -44,6 +45,12 @@ namespace d3d9
     // Fired once when TestCooperativeLevel() notices the device is
     // back to S_OK after being in a lost state.
     //
-    device_restored
+    device_restored,
+
+    // Fired after IDirect3D9::CreateDevice() succeeds and returns a
+    // new IDirect3DDevice9 to the application. Emitted by factory, not
+    // by device.
+    //
+    device_created
   };
 }

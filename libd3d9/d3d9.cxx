@@ -58,6 +58,68 @@ namespace d3d9
       return (i != reg.end ()) ? i->second : nullptr;
     }
 
+    // Factory registry.
+    //
+    // Notice that we patch the shared IDirect3D9 vtable rather than a specific
+    // instance. The idea is that all IDirect3D9 instances in the process will
+    // naturally route their CreateDevice calls through our thunk.
+    //
+    // Note that only one factory may be active per vtable at a given time. A
+    // second factory instance would end up overwriting the guard already
+    // installed by the first. This would be disastrous, as it would leave the
+    // first's guard pointing at our own thunk rather than the real, underlying
+    // implementation.
+    //
+    std::mutex factory_reg_mtx;
+    std::unordered_map<void**, factory*> factory_reg;
+
+    // Register factory f for the vtable vt.
+    //
+    // Return false if vt is already present in the registry. We just lock,
+    // emplace, and return the insertion status directly. Notice that we hold
+    // the lock just long enough to perform the emplacement.
+    //
+    bool register_factory (void** vt, factory* f)
+    {
+      std::lock_guard<std::mutex> l (factory_reg_mtx);
+      return factory_reg.emplace (vt, f).second;
+    }
+
+    // Remove the factory entry associated with vtable vt.
+    //
+    // Notice this is strictly noexcept. We just acquire the lock and erase.
+    // If the entry isn't there, erase() gracefully does nothing, which is
+    // exactly what we want.
+    //
+    void unregister_factory (void** vt) noexcept
+    {
+      std::lock_guard<std::mutex> l (factory_reg_mtx);
+      factory_reg.erase (vt);
+    }
+
+    // Look up the factory for the vtable extracted from d3d.
+    //
+    // Return nullptr if we fail to find one. We call this straight from the
+    // CreateDevice thunk, where d3d is essentially the raw 'this' pointer.
+    //
+    // Notice that we extract the vtable pointer here on the caller's behalf. We
+    // do this to keep the thunk call site clean and avoid leaking these nasty
+    // reinterpret_cast details up the stack.
+    //
+    factory* find_factory (IDirect3D9* d3d) noexcept
+    {
+      // A COM object's memory layout places the vtable pointer right at the
+      // beginning. So we cast the object pointer to a void*** and dereference
+      // it to grab the actual vtable pointer (void**).
+      //
+      void** const vt (*reinterpret_cast<void***> (d3d));
+
+      std::lock_guard<std::mutex> l (factory_reg_mtx);
+
+      const auto i (factory_reg.find (vt));
+      return i != factory_reg.end () ? i->second : nullptr;
+    }
+
     // Extract the vtable pointer from a COM object.
     //
     inline void** get_vtable (IUnknown* o) noexcept
@@ -124,6 +186,29 @@ namespace d3d9
       constexpr std::size_t get_depth_stencil_surface    (40);
       constexpr std::size_t begin_scene                  (41);
       constexpr std::size_t end_scene                    (42);
+
+      // IDirect3D9 vtable indices (separate object, same IUnknown preamble).
+      //
+      // Verified against the IDirect3D9 declaration in d3d9.h. IUnknown
+      // again occupies slots 0-2; IDirect3D9 methods begin at slot 3.
+      //
+      namespace d3d9_factory
+      {
+        constexpr std::size_t register_software_device (3);
+        constexpr std::size_t get_adapter_count        (4);
+        constexpr std::size_t get_adapter_identifier   (5);
+        constexpr std::size_t get_adapter_mode_count   (6);
+        constexpr std::size_t enum_adapter_modes        (7);
+        constexpr std::size_t get_adapter_display_mode  (8);
+        constexpr std::size_t check_device_type         (9);
+        constexpr std::size_t check_device_format       (10);
+        constexpr std::size_t check_device_multisample  (11);
+        constexpr std::size_t check_depth_stencil_match (12);
+        constexpr std::size_t check_device_format_conv  (13);
+        constexpr std::size_t get_device_caps           (14);
+        constexpr std::size_t get_adapter_monitor       (15);
+        constexpr std::size_t create_device             (16);
+      }
     }
 
     // vtable_guard implementation.
@@ -459,6 +544,176 @@ namespace d3d9
     {
       h->device_lost_state_.store (false, std::memory_order_relaxed);
       h->device_restored_disp_.dispatch (*d);
+    }
+
+    return r;
+  }
+
+  factory::factory ()
+    : vtable_ (nullptr)
+  {
+    // Obtain the d3d9.dll module handle. We deliberately use GetModuleHandleA()
+    // rather than LoadLibrary() to avoid bumping the module reference count. If
+    // the DLL is not loaded yet, it means the application hasn't initialized
+    // D3D9 and there is naturally nothing for us to intercept.
+    //
+    const HMODULE mod (::GetModuleHandleA ("d3d9.dll"));
+
+    if (mod == nullptr)
+      throw std::runtime_error ("d3d9.dll is not loaded in this process");
+
+    // Resolve the Direct3DCreate9 factory function.
+    //
+    const FARPROC fp (::GetProcAddress (mod, "Direct3DCreate9"));
+
+    if (fp == nullptr)
+      throw std::runtime_error ("Direct3DCreate9 not found in d3d9.dll");
+
+    // Create a scratch IDirect3D9 instance to gain access to the shared vtable.
+    // Since all IDirect3D9 instances share the exact same vtable layout, we
+    // only need this object long enough to extract the vtable pointer and
+    // install our guard. We will release it immediately after patching.
+    //
+    using create_fn = IDirect3D9*(WINAPI*) (UINT);
+    IDirect3D9* const scratch (
+      reinterpret_cast<create_fn> (fp) (D3D_SDK_VERSION));
+
+    if (scratch == nullptr)
+      throw std::runtime_error (
+        "Direct3DCreate9 returned null; SDK version mismatch?");
+
+    void** const vt (get_vtable (scratch));
+
+    // Register before patching so that the thunk can actually find us. If
+    // another factory happens to be already active, we refuse and release the
+    // scratch object before throwing.
+    //
+    if (!register_factory (vt, this))
+    {
+      scratch->Release ();
+      throw std::logic_error (
+        "a factory is already active for the IDirect3D9 vtable");
+    }
+
+    // Install the CreateDevice patch. Note that if vtable_guard throws (for
+    // instance, because VirtualProtect() failed), we must unregister before
+    // propagating the exception.
+    //
+    try
+    {
+      create_device_guard_ = detail::vtable_guard (
+        vt,
+        detail::vtable_index::d3d9_factory::create_device,
+        reinterpret_cast<void*> (&factory::thunk_create_device));
+    }
+    catch (...)
+    {
+      unregister_factory (vt);
+      scratch->Release ();
+      throw;
+    }
+
+    // Cache the vtable pointer so the destructor can unregister directly
+    // without having to reconstruct it from the guard's slot address.
+    //
+    vtable_ = vt;
+
+    // Release the scratch interface. The vtable lives in the DLL's .rdata
+    // section and remains valid for the lifetime of the module, so releasing
+    // the object does not invalidate any pointer we currently hold.
+    //
+    scratch->Release ();
+  }
+
+  factory::~factory () noexcept
+  {
+    // Restore the original CreateDevice slot first. From this point on, any new
+    // CreateDevice call in the process will bypass our thunk entirely.
+    //
+    create_device_guard_.restore ();
+
+    // Unregister after restoring. This ensures that any thunk invocation that
+    // raced with our destructor and is currently past the find_factory() lookup
+    // can still safely resolve us through the dispatcher.
+    //
+    if (vtable_ != nullptr)
+      unregister_factory (vtable_);
+  }
+
+  // Subscription API.
+  //
+  subscription_token factory::on_device_created (
+    event_traits<event_id::device_created>::callback_type cb)
+  {
+    assert (cb && "cb must not be empty");
+    const auto i (device_created_disp_.subscribe (std::move (cb)));
+    auto* p (&device_created_disp_);
+    return subscription_token ([p, i] { p->unsubscribe (i); });
+  }
+
+  // CreateDevice thunk.
+  //
+  // We forward the call to the original implementation first. On success, we
+  // dispatch device_created so that subscribers receive a fully initialized
+  // device. On failure, we simply propagate the error code untouched without
+  // dispatching.
+  //
+  // Regarding reentrancy: if a device_created subscriber calls CreateDevice()
+  // again (for example, to create a secondary device), the inner call will also
+  // route through this thunk and dispatch a second device_created event. There
+  // is no depth guard here because each call produces a logically distinct
+  // device and both events are meaningful. Callers are essentially responsible
+  // for not creating recursive loops.
+  //
+  HRESULT STDMETHODCALLTYPE
+  factory::thunk_create_device (IDirect3D9* d3d,
+                                UINT adapter,
+                                D3DDEVTYPE device_type,
+                                HWND focus_window,
+                                DWORD behavior_flags,
+                                D3DPRESENT_PARAMETERS* pp,
+                                IDirect3DDevice9** out_device)
+  {
+    factory* const f (find_factory (d3d));
+
+    // If find_factory() returns nullptr, it means this IDirect3D9 instance is
+    // not covered by any active factory. This can happen if it was created
+    // before our constructor ran, or if we have partially torn down. In this
+    // case, we cannot reach the original pointer without the guard, so the only
+    // safe action is to fail the call.
+    //
+    if (f == nullptr)
+    {
+      assert (false && "thunk_create_device called for unknown IDirect3D9");
+      return D3DERR_INVALIDCALL;
+    }
+
+    using fn_t = HRESULT (STDMETHODCALLTYPE*) (IDirect3D9*,
+                                               UINT,
+                                               D3DDEVTYPE,
+                                               HWND,
+                                               DWORD,
+                                               D3DPRESENT_PARAMETERS*,
+                                               IDirect3DDevice9**);
+
+    const auto o (reinterpret_cast<fn_t> (f->create_device_guard_.original ()));
+
+    assert (pp != nullptr && "pp must not be null");
+    assert (out_device != nullptr && "out_device must not be null");
+
+    const HRESULT r (o (d3d,
+                        adapter,
+                        device_type,
+                        focus_window,
+                        behavior_flags,
+                        pp,
+                        out_device));
+
+    if (SUCCEEDED (r))
+    {
+      assert (*out_device != nullptr &&
+              "CreateDevice succeeded with null device");
+      f->device_created_disp_.dispatch (**out_device, *pp);
     }
 
     return r;

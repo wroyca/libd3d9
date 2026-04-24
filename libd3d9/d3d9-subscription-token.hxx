@@ -52,6 +52,7 @@ namespace d3d9
 
   private:
     friend class device;
+    friend class factory;
 
     using cancel_fn = std::function<void ()>;
 

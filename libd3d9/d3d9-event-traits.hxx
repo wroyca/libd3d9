@@ -112,4 +112,27 @@ namespace d3d9
   {
     using callback_type = std::function<void (IDirect3DDevice9& d)>;
   };
+
+  // device_created
+  //
+  // Fired by factory after IDirect3D9::CreateDevice() returns S_OK. At this
+  // point, the IDirect3DDevice9 is fully initialised and the application has
+  // already received the pointer via its own out-parameter.
+  //
+  // The callback receives a reference to the freshly created device and the
+  // presentation parameters that were used to create it. The latter is
+  // particularly useful for driving an immediate d3d9::device setup since the
+  // swap-chain dimensions are already known.
+  //
+  // Note that subscribing to this event does not automatically install a
+  // d3d9::device manager. That remains the caller's responsibility. A typical
+  // subscriber creates a d3d9::device from the received pointer and stores it
+  // alongside any subscription tokens for further event handling.
+  //
+  template <>
+  struct event_traits<event_id::device_created>
+  {
+    using callback_type = std::function<void (IDirect3DDevice9& d,
+                                              D3DPRESENT_PARAMETERS& pp)>;
+  };
 }
