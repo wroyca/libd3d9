@@ -1,6 +1,6 @@
 : 1
 name: libd3d9
-version: 0.1.0-a.3
+version: 0.1.0-a.3.z
 summary: libd3d9 C++ bare
 license: GPL-3.0-or-later ; GNU General Public License v3.0 or later.
 depends: * build2 >= 0.18.0
