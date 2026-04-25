@@ -10,7 +10,7 @@ namespace d3d9
   // function) and the corresponding callback signatures are defined in the
   // event traits.
   //
-  enum class event_id: unsigned int
+  enum class event_id : unsigned int
   {
     // Fired after BeginScene() returns S_OK. We do not fire if the
     // scene failed to start.

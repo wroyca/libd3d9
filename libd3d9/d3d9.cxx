@@ -35,7 +35,8 @@ namespace d3d9
 
     // Register h for d. Return false if d is already present.
     //
-    bool register_device (IDirect3DDevice9* d, device* h)
+    bool
+    register_device (IDirect3DDevice9* d, device* h)
     {
       std::lock_guard<std::mutex> l (reg_mtx);
       return reg.emplace (d, h).second;
@@ -43,7 +44,8 @@ namespace d3d9
 
     // Remove the entry for d.
     //
-    void unregister_device (IDirect3DDevice9* d) noexcept
+    void
+    unregister_device (IDirect3DDevice9* d) noexcept
     {
       std::lock_guard<std::mutex> l (reg_mtx);
       reg.erase (d);
@@ -51,7 +53,8 @@ namespace d3d9
 
     // Look up the device for d. Return nullptr if not found.
     //
-    device* find_device (IDirect3DDevice9* d) noexcept
+    device*
+    find_device (IDirect3DDevice9* d) noexcept
     {
       std::lock_guard<std::mutex> l (reg_mtx);
       const auto i (reg.find (d));
@@ -79,7 +82,8 @@ namespace d3d9
     // emplace, and return the insertion status directly. Notice that we hold
     // the lock just long enough to perform the emplacement.
     //
-    bool register_factory (void** vt, factory* f)
+    bool
+    register_factory (void** vt, factory* f)
     {
       std::lock_guard<std::mutex> l (factory_reg_mtx);
       return factory_reg.emplace (vt, f).second;
@@ -91,7 +95,8 @@ namespace d3d9
     // If the entry isn't there, erase() gracefully does nothing, which is
     // exactly what we want.
     //
-    void unregister_factory (void** vt) noexcept
+    void
+    unregister_factory (void** vt) noexcept
     {
       std::lock_guard<std::mutex> l (factory_reg_mtx);
       factory_reg.erase (vt);
@@ -106,7 +111,8 @@ namespace d3d9
     // do this to keep the thunk call site clean and avoid leaking these nasty
     // reinterpret_cast details up the stack.
     //
-    factory* find_factory (IDirect3D9* d3d) noexcept
+    factory*
+    find_factory (IDirect3D9* d3d) noexcept
     {
       // A COM object's memory layout places the vtable pointer right at the
       // beginning. So we cast the object pointer to a void*** and dereference
@@ -122,7 +128,8 @@ namespace d3d9
 
     // Extract the vtable pointer from a COM object.
     //
-    inline void** get_vtable (IUnknown* o) noexcept
+    inline void**
+    get_vtable (IUnknown* o) noexcept
     {
       assert (o != nullptr);
       return *reinterpret_cast<void***> (o);
@@ -140,52 +147,52 @@ namespace d3d9
     {
       // IUnknown.
       //
-      constexpr std::size_t query_interface              (0);
-      constexpr std::size_t add_ref                      (1);
-      constexpr std::size_t release                      (2);
+      constexpr std::size_t query_interface                (0);
+      constexpr std::size_t add_ref                        (1);
+      constexpr std::size_t release                        (2);
 
       // IDirect3DDevice9.
       //
-      constexpr std::size_t test_cooperative_level       (3);
-      constexpr std::size_t get_available_texture_mem    (4);
-      constexpr std::size_t evict_managed_resources      (5);
-      constexpr std::size_t get_direct3d                 (6);
-      constexpr std::size_t get_device_caps              (7);
-      constexpr std::size_t get_display_mode             (8);
-      constexpr std::size_t get_creation_parameters      (9);
-      constexpr std::size_t set_cursor_properties        (10);
-      constexpr std::size_t set_cursor_position          (11);
-      constexpr std::size_t show_cursor                  (12);
-      constexpr std::size_t create_additional_swap_chain (13);
-      constexpr std::size_t get_swap_chain               (14);
-      constexpr std::size_t get_number_of_swap_chains    (15);
-      constexpr std::size_t reset                        (16);
-      constexpr std::size_t present                      (17);
-      constexpr std::size_t get_back_buffer              (18);
-      constexpr std::size_t get_raster_status            (19);
-      constexpr std::size_t set_dialog_box_mode          (20);
-      constexpr std::size_t set_gamma_ramp               (21);
-      constexpr std::size_t get_gamma_ramp               (22);
-      constexpr std::size_t create_texture               (23);
-      constexpr std::size_t create_volume_texture        (24);
-      constexpr std::size_t create_cube_texture          (25);
-      constexpr std::size_t create_vertex_buffer         (26);
-      constexpr std::size_t create_index_buffer          (27);
-      constexpr std::size_t create_render_target         (28);
-      constexpr std::size_t create_depth_stencil_surface (29);
-      constexpr std::size_t update_surface               (30);
-      constexpr std::size_t update_texture               (31);
-      constexpr std::size_t get_render_target_data       (32);
-      constexpr std::size_t get_front_buffer_data        (33);
-      constexpr std::size_t stretch_rect                 (34);
-      constexpr std::size_t color_fill                   (35);
+      constexpr std::size_t test_cooperative_level         (3);
+      constexpr std::size_t get_available_texture_mem      (4);
+      constexpr std::size_t evict_managed_resources        (5);
+      constexpr std::size_t get_direct3d                   (6);
+      constexpr std::size_t get_device_caps                (7);
+      constexpr std::size_t get_display_mode               (8);
+      constexpr std::size_t get_creation_parameters        (9);
+      constexpr std::size_t set_cursor_properties          (10);
+      constexpr std::size_t set_cursor_position            (11);
+      constexpr std::size_t show_cursor                    (12);
+      constexpr std::size_t create_additional_swap_chain   (13);
+      constexpr std::size_t get_swap_chain                 (14);
+      constexpr std::size_t get_number_of_swap_chains      (15);
+      constexpr std::size_t reset                          (16);
+      constexpr std::size_t present                        (17);
+      constexpr std::size_t get_back_buffer                (18);
+      constexpr std::size_t get_raster_status              (19);
+      constexpr std::size_t set_dialog_box_mode            (20);
+      constexpr std::size_t set_gamma_ramp                 (21);
+      constexpr std::size_t get_gamma_ramp                 (22);
+      constexpr std::size_t create_texture                 (23);
+      constexpr std::size_t create_volume_texture          (24);
+      constexpr std::size_t create_cube_texture            (25);
+      constexpr std::size_t create_vertex_buffer           (26);
+      constexpr std::size_t create_index_buffer            (27);
+      constexpr std::size_t create_render_target           (28);
+      constexpr std::size_t create_depth_stencil_surface   (29);
+      constexpr std::size_t update_surface                 (30);
+      constexpr std::size_t update_texture                 (31);
+      constexpr std::size_t get_render_target_data         (32);
+      constexpr std::size_t get_front_buffer_data          (33);
+      constexpr std::size_t stretch_rect                   (34);
+      constexpr std::size_t color_fill                     (35);
       constexpr std::size_t create_offscreen_plain_surface (36);
-      constexpr std::size_t set_render_target            (37);
-      constexpr std::size_t get_render_target            (38);
-      constexpr std::size_t set_depth_stencil_surface    (39);
-      constexpr std::size_t get_depth_stencil_surface    (40);
-      constexpr std::size_t begin_scene                  (41);
-      constexpr std::size_t end_scene                    (42);
+      constexpr std::size_t set_render_target              (37);
+      constexpr std::size_t get_render_target              (38);
+      constexpr std::size_t set_depth_stencil_surface      (39);
+      constexpr std::size_t get_depth_stencil_surface      (40);
+      constexpr std::size_t begin_scene                    (41);
+      constexpr std::size_t end_scene                      (42);
 
       // IDirect3D9 vtable indices (separate object, same IUnknown preamble).
       //
@@ -194,10 +201,10 @@ namespace d3d9
       //
       namespace d3d9_factory
       {
-        constexpr std::size_t register_software_device (3);
-        constexpr std::size_t get_adapter_count        (4);
-        constexpr std::size_t get_adapter_identifier   (5);
-        constexpr std::size_t get_adapter_mode_count   (6);
+        constexpr std::size_t register_software_device  (3);
+        constexpr std::size_t get_adapter_count         (4);
+        constexpr std::size_t get_adapter_identifier    (5);
+        constexpr std::size_t get_adapter_mode_count    (6);
         constexpr std::size_t enum_adapter_modes        (7);
         constexpr std::size_t get_adapter_display_mode  (8);
         constexpr std::size_t check_device_type         (9);
@@ -213,7 +220,8 @@ namespace d3d9
 
     // vtable_guard implementation.
     //
-    vtable_guard::vtable_guard (void** vt, std::size_t i, void* r)
+    vtable_guard::
+    vtable_guard (void** vt, std::size_t i, void* r)
     {
       assert (vt != nullptr && "vt must not be null");
       assert (r != nullptr && "r must not be null");
@@ -228,12 +236,14 @@ namespace d3d9
       assert (*slot_ == r && "patch write verification failed");
     }
 
-    vtable_guard::~vtable_guard ()
+    vtable_guard::
+    ~vtable_guard ()
     {
       restore ();
     }
 
-    void vtable_guard::restore () noexcept
+    void
+    vtable_guard::restore () noexcept
     {
       if (slot_ == nullptr)
         return;
@@ -248,7 +258,8 @@ namespace d3d9
       original_ = nullptr;
     }
 
-    void vtable_guard::write_ptr (void** s, void* v) noexcept
+    void
+    vtable_guard::write_ptr (void** s, void* v) noexcept
     {
       // The vtable resides in a read-only page (usually .rdata). Temporarily
       // grant write access, overwrite the pointer, and restore the protection.
@@ -281,7 +292,8 @@ namespace d3d9
 
   // device constructor and destructor.
   //
-  device::device (IDirect3DDevice9* d)
+  device::
+  device (IDirect3DDevice9* d)
     : device_ (d),
       device_lost_state_ (false)
   {
@@ -324,7 +336,8 @@ namespace d3d9
       reinterpret_cast<void*> (&device::thunk_end_scene));
   }
 
-  device::~device ()
+  device::
+  ~device ()
   {
     // Unregister first so no incoming thunk invocations can grab this instance
     // while we destruct the vtable guards.
@@ -334,8 +347,8 @@ namespace d3d9
 
   // Subscription API.
   //
-  subscription_token device::on_begin_scene (
-    event_traits<event_id::begin_scene>::callback_type cb)
+  subscription_token
+  device::on_begin_scene (event_traits<event_id::begin_scene>::callback_type cb)
   {
     assert (cb && "cb must not be empty");
     const auto i (begin_scene_disp_.subscribe (std::move (cb)));
@@ -343,8 +356,8 @@ namespace d3d9
     return subscription_token ([p, i] { p->unsubscribe (i); });
   }
 
-  subscription_token device::on_end_scene (
-    event_traits<event_id::end_scene>::callback_type cb)
+  subscription_token
+  device::on_end_scene (event_traits<event_id::end_scene>::callback_type cb)
   {
     assert (cb && "cb must not be empty");
     const auto i (end_scene_disp_.subscribe (std::move (cb)));
@@ -352,8 +365,8 @@ namespace d3d9
     return subscription_token ([p, i] { p->unsubscribe (i); });
   }
 
-  subscription_token device::on_present (
-    event_traits<event_id::present>::callback_type cb)
+  subscription_token
+  device::on_present (event_traits<event_id::present>::callback_type cb)
   {
     assert (cb && "cb must not be empty");
     const auto i (present_disp_.subscribe (std::move (cb)));
@@ -361,8 +374,8 @@ namespace d3d9
     return subscription_token ([p, i] { p->unsubscribe (i); });
   }
 
-  subscription_token device::on_pre_reset (
-    event_traits<event_id::pre_reset>::callback_type cb)
+  subscription_token
+  device::on_pre_reset (event_traits<event_id::pre_reset>::callback_type cb)
   {
     assert (cb && "cb must not be empty");
     const auto i (pre_reset_disp_.subscribe (std::move (cb)));
@@ -370,8 +383,8 @@ namespace d3d9
     return subscription_token ([p, i] { p->unsubscribe (i); });
   }
 
-  subscription_token device::on_post_reset (
-    event_traits<event_id::post_reset>::callback_type cb)
+  subscription_token
+  device::on_post_reset (event_traits<event_id::post_reset>::callback_type cb)
   {
     assert (cb && "cb must not be empty");
     const auto i (post_reset_disp_.subscribe (std::move (cb)));
@@ -379,8 +392,8 @@ namespace d3d9
     return subscription_token ([p, i] { p->unsubscribe (i); });
   }
 
-  subscription_token device::on_device_lost (
-    event_traits<event_id::device_lost>::callback_type cb)
+  subscription_token
+  device::on_device_lost (event_traits<event_id::device_lost>::callback_type cb)
   {
     assert (cb && "cb must not be empty");
     const auto i (device_lost_disp_.subscribe (std::move (cb)));
@@ -388,7 +401,8 @@ namespace d3d9
     return subscription_token ([p, i] { p->unsubscribe (i); });
   }
 
-  subscription_token device::on_device_restored (
+  subscription_token
+  device::on_device_restored (
     event_traits<event_id::device_restored>::callback_type cb)
   {
     assert (cb && "cb must not be empty");
@@ -411,7 +425,7 @@ namespace d3d9
     device* const h (find_device (d));
     assert (h != nullptr && "unregistered device");
 
-    using fn_t = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*);
+    using fn_t = HRESULT (STDMETHODCALLTYPE*) (IDirect3DDevice9*);
     const auto o (reinterpret_cast<fn_t> (h->begin_scene_guard_.original ()));
 
     if (bs_depth > 0)
@@ -438,7 +452,7 @@ namespace d3d9
     device* const h (find_device (d));
     assert (h != nullptr && "unregistered device");
 
-    using fn_t = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*);
+    using fn_t = HRESULT (STDMETHODCALLTYPE*) (IDirect3DDevice9*);
     const auto o (reinterpret_cast<fn_t> (h->end_scene_guard_.original ()));
 
     if (es_depth > 0)
@@ -456,19 +470,19 @@ namespace d3d9
   //
   HRESULT STDMETHODCALLTYPE
   device::thunk_present (IDirect3DDevice9* d,
-                              const RECT* sr,
-                              const RECT* dr,
-                              HWND dw,
-                              const RGNDATA* dg)
+                         const RECT* sr,
+                         const RECT* dr,
+                         HWND dw,
+                         const RGNDATA* dg)
   {
     device* const h (find_device (d));
     assert (h != nullptr && "unregistered device");
 
-    using fn_t = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*,
-                                              const RECT*,
-                                              const RECT*,
-                                              HWND,
-                                              const RGNDATA*);
+    using fn_t = HRESULT (STDMETHODCALLTYPE*) (IDirect3DDevice9*,
+                                               const RECT*,
+                                               const RECT*,
+                                               HWND,
+                                               const RGNDATA*);
     const auto o (reinterpret_cast<fn_t> (h->present_guard_.original ()));
 
     if (p_depth > 0)
@@ -488,8 +502,7 @@ namespace d3d9
   // released, call the original method, and then inform post_reset handlers.
   //
   HRESULT STDMETHODCALLTYPE
-  device::thunk_reset (IDirect3DDevice9* d,
-                            D3DPRESENT_PARAMETERS* pp)
+  device::thunk_reset (IDirect3DDevice9* d, D3DPRESENT_PARAMETERS* pp)
   {
     device* const h (find_device (d));
     assert (h != nullptr && "unregistered device");
@@ -527,7 +540,7 @@ namespace d3d9
     device* const h (find_device (d));
     assert (h != nullptr && "unregistered device");
 
-    using fn_t = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*);
+    using fn_t = HRESULT (STDMETHODCALLTYPE*) (IDirect3DDevice9*);
     const auto o (reinterpret_cast<fn_t> (h->tcl_guard_.original ()));
 
     const HRESULT r (o (d));
@@ -625,7 +638,8 @@ namespace d3d9
     scratch->Release ();
   }
 
-  factory::~factory ()
+  factory::
+  ~factory ()
   {
     // Restore the original CreateDevice slot first. From this point on, any new
     // CreateDevice call in the process will bypass our thunk entirely.
@@ -642,7 +656,8 @@ namespace d3d9
 
   // Subscription API.
   //
-  subscription_token factory::on_device_created (
+  subscription_token
+  factory::on_device_created (
     event_traits<event_id::device_created>::callback_type cb)
   {
     assert (cb && "cb must not be empty");

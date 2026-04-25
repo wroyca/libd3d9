@@ -138,10 +138,7 @@ namespace d3d9
       // CallWindowProcW.
       //
       static LRESULT CALLBACK
-      thunk_wnd_proc (HWND hwnd,
-                      UINT message,
-                      WPARAM wparam,
-                      LPARAM lparam);
+      thunk_wnd_proc (HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
       // The managed device that we borrowed from the caller.
       //

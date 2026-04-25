@@ -17,10 +17,8 @@
 // site and, rather nicely, suppress any "declared but not used" warnings if the
 // header pulls in other implementation details.
 //
-extern LRESULT ImGui_ImplWin32_WndProcHandler (HWND   hwnd,
-                                               UINT   msg,
-                                               WPARAM wp,
-                                               LPARAM lp);
+extern LRESULT
+ImGui_ImplWin32_WndProcHandler (HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
 
 namespace d3d9
 {
@@ -46,7 +44,8 @@ namespace d3d9
       // Register the renderer for a specific window. Return false if this
       // window is already present in the registry.
       //
-      bool register_renderer (HWND hwnd, imgui_renderer* r)
+      bool
+      register_renderer (HWND hwnd, imgui_renderer* r)
       {
         std::lock_guard<std::mutex> l (wndproc_reg_mtx);
         return wndproc_reg.emplace (hwnd, r).second;
@@ -54,7 +53,8 @@ namespace d3d9
 
       // Remove the registry entry for the given window.
       //
-      void unregister_renderer (HWND hwnd) noexcept
+      void
+      unregister_renderer (HWND hwnd) noexcept
       {
         std::lock_guard<std::mutex> l (wndproc_reg_mtx);
         wndproc_reg.erase (hwnd);
@@ -63,7 +63,8 @@ namespace d3d9
       // Look up the active renderer for the given window. Return a null pointer
       // if nothing is found.
       //
-      imgui_renderer* find_renderer (HWND hwnd) noexcept
+      imgui_renderer*
+      find_renderer (HWND hwnd) noexcept
       {
         std::lock_guard<std::mutex> l (wndproc_reg_mtx);
         const auto i (wndproc_reg.find (hwnd));
@@ -71,7 +72,8 @@ namespace d3d9
       }
     }
 
-    imgui_renderer::imgui_renderer (d3d9::device& dev)
+    imgui_renderer::
+    imgui_renderer (d3d9::device& dev)
       : device_               (dev),
         window_               (nullptr),
         original_wnd_proc_    (nullptr),
@@ -103,7 +105,8 @@ namespace d3d9
       init (dev.managed_device ());
     }
 
-    imgui_renderer::imgui_renderer (d3d9::device& dev, HWND window)
+    imgui_renderer::
+    imgui_renderer (d3d9::device& dev, HWND window)
       : device_               (dev),
         window_               (window),
         original_wnd_proc_    (nullptr),
@@ -126,7 +129,8 @@ namespace d3d9
     // a matching release in the destructor. Any failure path cleans up exactly
     // what has been acquired up to that point.
     //
-    void imgui_renderer::init (IDirect3DDevice9* dev_ptr)
+    void
+    imgui_renderer::init (IDirect3DDevice9* dev_ptr)
     {
       // ImGui context.
       //
@@ -292,7 +296,8 @@ namespace d3d9
     // ImGui call can suddenly fire from the render thread while we are halfway
     // through tearing down the backends.
     //
-    imgui_renderer::~imgui_renderer ()
+    imgui_renderer::
+    ~imgui_renderer ()
     {
       // Cancel render-thread callbacks first.
       //
@@ -341,7 +346,8 @@ namespace d3d9
 
     // Subscription API.
     //
-    subscription_token imgui_renderer::on_frame (std::function<void ()> cb)
+    subscription_token
+    imgui_renderer::on_frame (std::function<void ()> cb)
     {
       assert (cb && "cb must not be empty");
 
@@ -377,7 +383,8 @@ namespace d3d9
     // raw, jittery precision directly to the display pipeline. It is the
     // optimal trade-off for an overlay.
     //
-    void imgui_renderer::on_end_scene_impl (IDirect3DDevice9&)
+    void
+    imgui_renderer::on_end_scene_impl (IDirect3DDevice9&)
     {
       ImGui_ImplDX9_NewFrame ();
       ImGui_ImplWin32_NewFrame ();
@@ -395,7 +402,8 @@ namespace d3d9
     // a mouse report. Here we accumulate the client-space position and then
     // forward it to the ImGui event queue.
     //
-    void imgui_renderer::feed_raw_mouse (const RAWMOUSE& rm) noexcept
+    void
+    imgui_renderer::feed_raw_mouse (const RAWMOUSE& rm) noexcept
     {
       ImGuiIO& io (ImGui::GetIO ());
 
@@ -492,10 +500,7 @@ namespace d3d9
     //     events.
     //
     LRESULT CALLBACK
-    imgui_renderer::thunk_wnd_proc (HWND   hwnd,
-                                    UINT   msg,
-                                    WPARAM wp,
-                                    LPARAM lp)
+    imgui_renderer::thunk_wnd_proc (HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     {
       imgui_renderer* const r (find_renderer (hwnd));
 
@@ -510,7 +515,7 @@ namespace d3d9
 
       switch (msg)
       {
-      case WM_INPUT:
+        case WM_INPUT:
         {
           // Extract the RAWINPUT header first to confirm this is actually a
           // mouse report before committing to the full GetRawInputData fetch.
@@ -518,13 +523,11 @@ namespace d3d9
           UINT sz (sizeof (RAWINPUT));
           RAWINPUT raw {};
 
-          const UINT read (
-            ::GetRawInputData (
-              reinterpret_cast<HRAWINPUT> (lp),
-              RID_INPUT,
-              &raw,
-              &sz,
-              sizeof (RAWINPUTHEADER)));
+          const UINT read (::GetRawInputData (reinterpret_cast<HRAWINPUT> (lp),
+                                              RID_INPUT,
+                                              &raw,
+                                              &sz,
+                                              sizeof (RAWINPUTHEADER)));
 
           if (read != static_cast<UINT> (-1) &&
               raw.header.dwType == RIM_TYPEMOUSE)
@@ -539,23 +542,23 @@ namespace d3d9
           break;
         }
 
-      case WM_MOUSEMOVE:
-        // Suppressed specifically from ImGui since the high-fidelity position
-        // arrives through WM_INPUT. Gracefully fall through to CallWindowProcW
-        // so the host application remains unaffected.
-        //
-        break;
+        case WM_MOUSEMOVE:
+          // Suppressed specifically from ImGui since the high-fidelity position
+          // arrives through WM_INPUT. Gracefully fall through to
+          // CallWindowProcW so the host application remains unaffected.
+          //
+          break;
 
-      default:
-        // All remaining messages are unconditionally delegated to the ImGui
-        // Win32 backend. Notice that ImGui_ImplWin32_WndProcHandler only
-        // returns non-zero for WM_SETCURSOR (to prevent flickering).
-        // Purposefully do not gate CallWindowProcW on this return value. That
-        // is, we must never consume messages from the host application's event
-        // chain.
-        //
-        ImGui_ImplWin32_WndProcHandler (hwnd, msg, wp, lp);
-        break;
+        default:
+          // All remaining messages are unconditionally delegated to the ImGui
+          // Win32 backend. Notice that ImGui_ImplWin32_WndProcHandler only
+          // returns non-zero for WM_SETCURSOR (to prevent flickering).
+          // Purposefully do not gate CallWindowProcW on this return value. That
+          // is, we must never consume messages from the host application's
+          // event chain.
+          //
+          ImGui_ImplWin32_WndProcHandler (hwnd, msg, wp, lp);
+          break;
       }
 
       return ::CallWindowProcW (r->original_wnd_proc_, hwnd, msg, wp, lp);

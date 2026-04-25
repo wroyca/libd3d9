@@ -49,6 +49,7 @@ namespace d3d9
 
       vtable_guard (vtable_guard&& other) noexcept;
       vtable_guard& operator= (vtable_guard&& other) noexcept;
+
       vtable_guard (const vtable_guard&) = delete;
       vtable_guard& operator= (const vtable_guard&) = delete;
 
@@ -113,7 +114,7 @@ namespace d3d9
     }
 
     inline vtable_guard&
-    vtable_guard::operator= (vtable_guard&& other) noexcept
+    vtable_guard::operator = (vtable_guard&& other) noexcept
     {
       if (this != &other)
       {

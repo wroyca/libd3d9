@@ -1,7 +1,7 @@
 #pragma once
 
-#include <utility>
 #include <functional>
+#include <utility>
 
 #include <libd3d9/export.hxx>
 
@@ -39,7 +39,8 @@ namespace d3d9
 
     // Return true if we still have an active subscription.
     //
-    explicit operator bool () const noexcept;
+    explicit
+    operator bool () const noexcept;
 
     // Cancel the subscription right now.
     //
@@ -92,8 +93,8 @@ namespace d3d9
   {
   }
 
-  inline subscription_token& subscription_token::
-  operator= (subscription_token&& other) noexcept
+  inline subscription_token&
+  subscription_token::operator = (subscription_token&& other) noexcept
   {
     if (this != &other)
     {
@@ -110,8 +111,8 @@ namespace d3d9
     return static_cast<bool> (cancel_);
   }
 
-  inline void subscription_token::
-  reset () noexcept
+  inline void
+  subscription_token::reset () noexcept
   {
     if (cancel_)
     {
