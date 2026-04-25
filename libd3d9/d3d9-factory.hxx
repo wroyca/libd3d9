@@ -31,7 +31,7 @@ namespace d3d9
     // Clean up. Restores the original CreateDevice pointer and removes us from
     // the process-wide registry.
     //
-    ~factory () noexcept;
+    ~factory ();
 
     // Disable copying and moving. The internal thunk holds a raw pointer to
     // this instance, so moving it would leave a dangling pointer.

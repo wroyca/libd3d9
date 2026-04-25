@@ -45,7 +45,7 @@ namespace d3d9
       // Restore the original pointer. If we are already inactive, this is just
       // a no-op.
       //
-      ~vtable_guard () noexcept;
+      ~vtable_guard ();
 
       vtable_guard (vtable_guard&& other) noexcept;
       vtable_guard& operator= (vtable_guard&& other) noexcept;

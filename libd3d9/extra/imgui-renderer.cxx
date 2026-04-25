@@ -292,7 +292,7 @@ namespace d3d9
     // ImGui call can suddenly fire from the render thread while we are halfway
     // through tearing down the backends.
     //
-    imgui_renderer::~imgui_renderer () noexcept
+    imgui_renderer::~imgui_renderer ()
     {
       // Cancel render-thread callbacks first.
       //

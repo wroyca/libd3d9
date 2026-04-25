@@ -86,7 +86,7 @@ namespace d3d9
     // Restore all vtable and unregister from the internal device table. Note
     // that all registered subscriptions will become inactive automatically.
     //
-    ~device () noexcept;
+    ~device ();
 
     // Explicitly delete copy and move. The internal thunks hold this instance
     // by raw pointer, so moving or copying is invalid.

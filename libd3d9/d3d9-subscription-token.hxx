@@ -29,7 +29,7 @@ namespace d3d9
   {
   public:
     subscription_token () noexcept = default;
-    ~subscription_token () noexcept;
+    ~subscription_token ();
 
     subscription_token (subscription_token&&) noexcept;
     subscription_token& operator= (subscription_token&&) noexcept;
@@ -81,7 +81,7 @@ namespace d3d9
   }
 
   inline subscription_token::
-  ~subscription_token () noexcept
+  ~subscription_token ()
   {
     reset ();
   }

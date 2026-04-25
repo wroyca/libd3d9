@@ -228,7 +228,7 @@ namespace d3d9
       assert (*slot_ == r && "patch write verification failed");
     }
 
-    vtable_guard::~vtable_guard () noexcept
+    vtable_guard::~vtable_guard ()
     {
       restore ();
     }
@@ -324,7 +324,7 @@ namespace d3d9
       reinterpret_cast<void*> (&device::thunk_end_scene));
   }
 
-  device::~device () noexcept
+  device::~device ()
   {
     // Unregister first so no incoming thunk invocations can grab this instance
     // while we destruct the vtable guards.
@@ -625,7 +625,7 @@ namespace d3d9
     scratch->Release ();
   }
 
-  factory::~factory () noexcept
+  factory::~factory ()
   {
     // Restore the original CreateDevice slot first. From this point on, any new
     // CreateDevice call in the process will bypass our thunk entirely.

@@ -82,7 +82,7 @@ namespace d3d9
       // remove the Raw Input registration, and shut down the ImGui backends. If
       // we own the ImGui context, we destroy it here as well.
       //
-      ~imgui_renderer () noexcept;
+      ~imgui_renderer ();
 
       // Explicitly delete the copy and move operations. We do this because the
       // WndProc thunk and the device subscriptions hold raw pointers to this
