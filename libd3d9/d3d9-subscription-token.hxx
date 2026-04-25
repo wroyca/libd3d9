@@ -15,11 +15,11 @@ namespace d3d9
   // and removes the callback from the dispatcher. We make tokens move-only so
   // we don't accidentally get double-cancellations.
   //
-  // A quick note on lifetimes: the token must not outlive the device that
-  // created it. It holds a raw pointer to an internal dispatcher owned by the
-  // interception, so if the interception is destroyed first, the pointer goes
-  // dangling. In practice, you should store tokens as members of an object
-  // whose lifetime is strictly nested inside the interception.
+  // A quick note on lifetimes: the token must not outlive the object that
+  // created it. It holds a raw pointer to an internal dispatcher, so if the
+  // owning object is destroyed first the pointer goes dangling. In practice,
+  // store tokens as members of an object whose lifetime is strictly nested
+  // inside the subscription source.
   //
   // Thread safety is fairly straightforward here. You can call reset() (and
   // thus the destructor) from any thread. Just don't call it concurrently on
@@ -50,11 +50,22 @@ namespace d3d9
     void
     reset () noexcept;
 
+    // The idea here is to provide an internal factory so that event sources
+    // within the library can construct tokens. We want to achieve this without
+    // exposing the constructor that takes the cancellation function directly in
+    // the public interface.
+    //
+    using cancel_fn = std::function<void ()>;
+
+    static subscription_token
+    make (cancel_fn fn) noexcept
+    {
+      return subscription_token (std::move (fn));
+    }
+
   private:
     friend class device;
     friend class factory;
-
-    using cancel_fn = std::function<void ()>;
 
     explicit subscription_token (cancel_fn) noexcept;
 

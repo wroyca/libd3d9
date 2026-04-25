@@ -5,3 +5,16 @@ summary: libd3d9 C++ bare
 license: GPL-3.0-or-later ; GNU General Public License v3.0 or later.
 depends: * build2 >= 0.18.0
 depends: * bpkg >= 0.18.0
+
+depends:
+\
+libimgui-docking
+{
+  prefer
+  {
+    config.libimgui_docking.backend = win32 dx9
+  }
+
+  accept (true)
+}
+\
