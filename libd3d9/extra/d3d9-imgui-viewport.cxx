@@ -432,6 +432,10 @@ namespace d3d9
       game_height_ = desc.Height;
       game_format_ = desc.Format;
 
+      D3DFORMAT capture_format = game_format_;
+      if (capture_format == D3DFMT_A8R8G8B8)
+        capture_format = D3DFMT_X8R8G8B8;
+
       // Now create a render-target texture that matches the backbuffer exactly.
       // Note that D3DUSAGE_RENDERTARGET + D3DPOOL_DEFAULT is the only valid
       // combination for a StretchRect destination.
@@ -441,7 +445,7 @@ namespace d3d9
                                          game_height_,
                                          1, // mip levels
                                          D3DUSAGE_RENDERTARGET,
-                                         game_format_,
+                                         capture_format,
                                          D3DPOOL_DEFAULT,
                                          &tex,
                                          nullptr));
