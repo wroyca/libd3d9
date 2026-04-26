@@ -433,11 +433,11 @@ namespace d3d9
 
     ++bs_depth;
     const HRESULT r (o (d));
-    --bs_depth;
 
     if (SUCCEEDED (r))
       h->begin_scene_disp_.dispatch (*d);
 
+    --bs_depth;
     return r;
   }
 
