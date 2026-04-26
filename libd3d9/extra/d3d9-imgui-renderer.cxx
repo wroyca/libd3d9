@@ -78,10 +78,7 @@ namespace d3d9
         window_               (nullptr),
         original_wnd_proc_    (nullptr),
         context_              (nullptr),
-        owns_context_         (false),
-        raw_input_registered_ (false),
-        mouse_x_              (0.0f),
-        mouse_y_              (0.0f)
+        owns_context_         (false)
     {
       // Derive the target window from the device creation parameters. The focus
       // window is the HWND that D3D9 inherently uses for cursor and cooperative
@@ -111,10 +108,7 @@ namespace d3d9
         window_               (window),
         original_wnd_proc_    (nullptr),
         context_              (nullptr),
-        owns_context_         (false),
-        raw_input_registered_ (false),
-        mouse_x_              (0.0f),
-        mouse_y_              (0.0f)
+        owns_context_         (false)
     {
       if (window == nullptr)
         throw std::invalid_argument ("window must not be null");
@@ -158,9 +152,7 @@ namespace d3d9
       // Win32 platform backend.
       //
       // Rely on ImGui_ImplWin32 for display size, delta time, DPI scaling, and
-      // standard cursor management. Specifically, do not rely on
-      // ImGui_ImplWin32_WndProcHandler for mouse movement. That is handled
-      // out-of-band through Raw Input instead.
+      // standard cursor and mouse management.
       //
       if (!ImGui_ImplWin32_Init (window_))
       {
@@ -172,27 +164,6 @@ namespace d3d9
         throw std::runtime_error ("ImGui_ImplWin32_Init failed");
       }
 
-      // Raw Input device registration.
-      //
-      // Request high-frequency mouse reports (HID usage page 0x01, usage
-      // 0x02) targeted precisely at our window. Leave dwFlags as 0 (no
-      // RIDEV_NOLEGACY, no RIDEV_INPUTSINK) so we only capture while
-      // focused. and leave the legacy WM_MOUSEMOVE stream completely intact
-      // for the host application to consume.
-      //
-      // If registration fails, fall back to the WM_MOUSEMOVE path.
-      //
-      RAWINPUTDEVICE rid {};
-      rid.usUsagePage = 0x01; // HID_USAGE_PAGE_GENERIC
-      rid.usUsage     = 0x02; // HID_USAGE_GENERIC_MOUSE
-      rid.dwFlags     = 0;
-      rid.hwndTarget  = window_;
-
-      raw_input_registered_ =
-        (::RegisterRawInputDevices (&rid, 1, sizeof (rid)) == TRUE);
-
-      // assert (raw_input_registered_ && "RegisterRawInputDevices failed. ");
-
       // HWND registry.
       //
       // Register before subclassing so that the WndProc thunk can look us up
@@ -201,16 +172,6 @@ namespace d3d9
       //
       if (!register_renderer (window_, this))
       {
-        if (raw_input_registered_)
-        {
-          RAWINPUTDEVICE remove {};
-          remove.usUsagePage = 0x01;
-          remove.usUsage     = 0x02;
-          remove.dwFlags     = RIDEV_REMOVE;
-          remove.hwndTarget  = nullptr;
-          ::RegisterRawInputDevices (&remove, 1, sizeof (remove));
-        }
-
         ImGui_ImplWin32_Shutdown ();
         ImGui_ImplDX9_Shutdown ();
 
@@ -242,16 +203,6 @@ namespace d3d9
         const DWORD err (::GetLastError ());
 
         unregister_renderer (window_);
-
-        if (raw_input_registered_)
-        {
-          RAWINPUTDEVICE remove {};
-          remove.usUsagePage = 0x01;
-          remove.usUsage     = 0x02;
-          remove.dwFlags     = RIDEV_REMOVE;
-          remove.hwndTarget  = nullptr;
-          ::RegisterRawInputDevices (&remove, 1, sizeof (remove));
-        }
 
         ImGui_ImplWin32_Shutdown ();
         ImGui_ImplDX9_Shutdown ();
@@ -326,16 +277,6 @@ namespace d3d9
       }
 
       unregister_renderer (window_);
-
-      if (raw_input_registered_)
-      {
-        RAWINPUTDEVICE remove {};
-        remove.usUsagePage = 0x01;
-        remove.usUsage     = 0x02;
-        remove.dwFlags     = RIDEV_REMOVE;
-        remove.hwndTarget  = nullptr;
-        ::RegisterRawInputDevices (&remove, 1, sizeof (remove));
-      }
 
       ImGui_ImplWin32_Shutdown ();
       ImGui_ImplDX9_Shutdown ();
@@ -424,14 +365,6 @@ namespace d3d9
     //   5. ImGui::Render                - Finalizes the draw list.
     //   6. ImGui_ImplDX9_RenderDrawData - Issues actual D3D9 draw calls.
     //
-    // Note on mouse position accuracy: WM_INPUT events naturally accumulate
-    // into mouse_x_ and mouse_y_ throughout the message-pump phase.
-    // ImGui_ImplWin32_NewFrame synchronizes against GetCursorPos, reflecting
-    // the true cursor at frame time regardless of accumulated deltas. This
-    // yields sub-frame precision during rapid movement without exposing that
-    // raw, jittery precision directly to the display pipeline. It is the
-    // optimal trade-off for an overlay.
-    //
     void
     imgui_renderer::on_end_scene_impl (IDirect3DDevice9& d)
     {
@@ -447,108 +380,12 @@ namespace d3d9
       ImGui_ImplDX9_RenderDrawData (ImGui::GetDrawData ());
     }
 
-    // Raw Input mouse handler.
-    //
-    // This is called from thunk_wnd_proc for every WM_INPUT message that bears
-    // a mouse report. Here we accumulate the client-space position and then
-    // forward it to the ImGui event queue.
-    //
-    void
-    imgui_renderer::feed_raw_mouse (const RAWMOUSE& rm) noexcept
-    {
-      ImGuiIO& io (ImGui::GetIO ());
-
-      if ((rm.usFlags & MOUSE_MOVE_ABSOLUTE) != 0)
-      {
-        // Handle absolute coordinates. These are typically generated by sources
-        // like Remote Desktop, Citrix, and various graphics tablets. Note that
-        // the values arrive normalized to the [0, 65535] range.
-        //
-        const bool vd ((rm.usFlags & MOUSE_VIRTUAL_DESKTOP) != 0);
-
-        const int sw (
-          ::GetSystemMetrics (vd ? SM_CXVIRTUALSCREEN : SM_CXSCREEN));
-        const int sh (
-          ::GetSystemMetrics (vd ? SM_CYVIRTUALSCREEN : SM_CYSCREEN));
-
-        POINT p;
-        p.x = static_cast<LONG> ((rm.lLastX / 65535.0f) * sw);
-        p.y = static_cast<LONG> ((rm.lLastY / 65535.0f) * sh);
-
-        ::ScreenToClient (window_, &p);
-
-        mouse_x_ = static_cast<float> (p.x);
-        mouse_y_ = static_cast<float> (p.y);
-      }
-      else if (rm.lLastX != 0 || rm.lLastY != 0)
-      {
-        // Handle relative movement, which represents the common case for gaming
-        // mice.
-        //
-        // We continuously accumulate the delta. Because
-        // ImGui_ImplWin32_NewFrame enforces synchronization from GetCursorPos
-        // at the start of each frame, any subtle drift between WM_INPUT reports
-        // cannot possibly compound beyond a single frame's worth of error.
-        //
-        mouse_x_ += static_cast<float> (rm.lLastX);
-        mouse_y_ += static_cast<float> (rm.lLastY);
-
-        // Clamp tightly to the client area. Severe ballistic acceleration near
-        // the edge of the window can push the accumulated position far outside
-        // the client rect, which in turn causes ImGui to hallucinate phantom
-        // out-of-window coordinates.
-        //
-        RECT cr {};
-        ::GetClientRect (window_, &cr);
-
-        if (mouse_x_ < 0.0f)
-          mouse_x_ = 0.0f;
-        else if (mouse_x_ > static_cast<float> (cr.right))
-          mouse_x_ = static_cast<float> (cr.right);
-
-        if (mouse_y_ < 0.0f)
-          mouse_y_ = 0.0f;
-        else if (mouse_y_ > static_cast<float> (cr.bottom))
-          mouse_y_ = static_cast<float> (cr.bottom);
-      }
-      else
-      {
-        // If lLastX == 0 and lLastY == 0 with MOUSE_MOVE_RELATIVE, it implies
-        // the report carries strictly button or wheel data with zero movement.
-        // We skip the position update entirely to prevent stomping the ImGui
-        // state with a useless no-op.
-        //
-        return;
-      }
-
-      io.AddMousePosEvent (mouse_x_, mouse_y_);
-    }
-
     // WndProc thunk.
     //
     // This is the replacement window procedure injected by
     // SetWindowLongPtrW. It routes each message to the
-    // relevant ImGui subsystem and then always tails through to the
-    // original procedure.
-    //
-    // Message routing:
-    //
-    //   WM_INPUT (mouse)
-    //     Handled entirely by feed_raw_mouse. Do not forward this to
-    //     ImGui_ImplWin32_WndProcHandler to avoid duplicate processing.
-    //
-    //   WM_MOUSEMOVE
-    //     Aggressively suppressed from ImGui. The mouse position already
-    //     arrives through WM_INPUT with far superior temporal precision.
-    //     Suppressing it here prevents ImGui_ImplWin32_WndProcHandler
-    //     from overwriting our carefully accumulated sub-frame position
-    //     with a potentially coalesced, lower-frequency variant. The
-    //     original WndProc naturally still receives the message.
-    //
-    //   All other messages
-    //     Forwarded faithfully to ImGui_ImplWin32_WndProcHandler to
-    //     cover keyboard input, mouse clicks, scrolling, and focus
-    //     events.
+    // relevant ImGui subsystem, evaluates the optional message gate, and
+    // then typically tails through to the original procedure.
     //
     LRESULT CALLBACK
     imgui_renderer::thunk_wnd_proc (HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -564,53 +401,29 @@ namespace d3d9
       if (r == nullptr)
         return ::DefWindowProcW (hwnd, msg, wp, lp);
 
-      switch (msg)
+      // Delegate to the ImGui Win32 backend. Notice that ImGui ImplWin32
+      // WndProcHandler only returns non-zero for WM_SETCURSOR (to prevent
+      // flickering). Purposefully do not gate CallWindowProcW on this return
+      // value. That is, we must never consume messages from the host
+      // application's event chain blindly.
+      //
+      ImGui_ImplWin32_WndProcHandler (hwnd, msg, wp, lp);
+
+      // Evaluate the message gate.
+      //
+      // If the gate is installed and returns false, we suppress the message
+      // from reaching the original window procedure and return DefWindowProcW
+      // instead.
+      //
+      bool forward (true);
       {
-        case WM_INPUT:
-        {
-          // Extract the RAWINPUT header first to confirm this is actually a
-          // mouse report before committing to the full GetRawInputData fetch.
-          //
-          UINT sz (sizeof (RAWINPUT));
-          RAWINPUT raw {};
-
-          const UINT read (::GetRawInputData (reinterpret_cast<HRAWINPUT> (lp),
-                                              RID_INPUT,
-                                              &raw,
-                                              &sz,
-                                              sizeof (RAWINPUTHEADER)));
-
-          if (read != static_cast<UINT> (-1) &&
-              raw.header.dwType == RIM_TYPEMOUSE)
-          {
-            r->feed_raw_mouse (raw.data.mouse);
-          }
-
-          // Do not forward to ImGui_ImplWin32_WndProcHandler. We have already
-          // fed the mouse position, and a second update from ImGui's native
-          // WM_INPUT handler would corrupt our accumulated positioning.
-          //
-          break;
-        }
-
-        case WM_MOUSEMOVE:
-          // Suppressed specifically from ImGui since the high-fidelity position
-          // arrives through WM_INPUT. Gracefully fall through to
-          // CallWindowProcW so the host application remains unaffected.
-          //
-          break;
-
-        default:
-          // All remaining messages are unconditionally delegated to the ImGui
-          // Win32 backend. Notice that ImGui_ImplWin32_WndProcHandler only
-          // returns non-zero for WM_SETCURSOR (to prevent flickering).
-          // Purposefully do not gate CallWindowProcW on this return value. That
-          // is, we must never consume messages from the host application's
-          // event chain.
-          //
-          ImGui_ImplWin32_WndProcHandler (hwnd, msg, wp, lp);
-          break;
+        std::lock_guard<std::mutex> l (r->gate_mtx_);
+        if (r->gate_)
+          forward = r->gate_ (msg, wp, lp);
       }
+
+      if (!forward)
+        return ::DefWindowProcW (hwnd, msg, wp, lp);
 
       return ::CallWindowProcW (r->original_wnd_proc_, hwnd, msg, wp, lp);
     }

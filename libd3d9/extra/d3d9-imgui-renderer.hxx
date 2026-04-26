@@ -188,15 +188,6 @@ namespace d3d9
       void
       on_end_scene_impl (IDirect3DDevice9& d);
 
-      // Feed a single RAWMOUSE report into the ImGui mouse position state.
-      //
-      // We handle both relative (gaming mice) and absolute (Remote Desktop,
-      // tablets) coordinate modes. We also clamp the accumulated position to
-      // the client area to prevent phantom out-of-window positions.
-      //
-      void
-      feed_raw_mouse (const RAWMOUSE& rm) noexcept;
-
       // Subclass the window procedure. We look up the renderer associated with
       // this HWND in the process-wide registry, perform the per-message ImGui
       // routing, and then always tail into the original WndProc via
@@ -226,23 +217,6 @@ namespace d3d9
       // the destructor.
       //
       bool owns_context_;
-
-      // Flag indicating whether RegisterRawInputDevices succeeded. We check
-      // this to safely attempt removal in the destructor.
-      //
-      bool raw_input_registered_;
-
-      // The accumulated client-space mouse coordinates derived from the
-      // WM_INPUT reports.
-      //
-      // Note that for relative mice, we update this incrementally and clamp it
-      // to the client rectangle. For absolute sources, we overwrite it
-      // directly. Because ImGui synchronizes the cursor position once per
-      // frame, any drift between reports will not persist across the frame
-      // boundaries.
-      //
-      float mouse_x_;
-      float mouse_y_;
 
       // Message gate and its guard mutex.
       //
