@@ -94,6 +94,27 @@ namespace d3d9
       imgui_renderer (imgui_renderer&&) = delete;
       imgui_renderer& operator= (imgui_renderer&&) = delete;
 
+      // Subscribe a pre-frame callback.
+      //
+      // We invoke this callback at the very beginning of the EndScene handler,
+      // right before we call ImGui_ImplDX9_NewFrame(). At this stage, the game
+      // itself has finished rendering to the backbuffer for the current frame,
+      // but we haven't yet started the ImGui rendering pass. This makes it the
+      // correct place for any sub-system that needs to observe or grab the
+      // game's render target before ImGui composites its UI over it.
+      //
+      // The device reference we pass to the callback is exactly the one that
+      // owns the EndScene we are intercepting.
+      //
+      // Note that calling StretchRect from this callback means we are dealing
+      // with surfaces while an active scene is technically still in progress.
+      // While most modern D3D9 drivers are perfectly fine with a StretchRect
+      // between D3DPOOL_DEFAULT render targets within a scene, it is strictly
+      // speaking driver-dependent, so keep an eye out for edge cases here.
+      //
+      subscription_token
+      on_pre_frame (std::function<void (IDirect3DDevice9&)> cb);
+
       // Subscribe a per-frame callback.
       //
       // We invoke this callback between ImGui::NewFrame() and ImGui::Render()
@@ -107,7 +128,51 @@ namespace d3d9
       subscription_token
       on_frame (std::function<void ()> callback);
 
+      // Install a message gate.
+      //
+      // The idea is to invoke this gate for every Windows message before we
+      // forward it to the original WndProc. If the gate returns false, we
+      // suppress the forward and quietly substitute DefWindowProcW instead.
+      //
+      // Note that ImGui itself is never subject to this gate. That is, we
+      // always feed it the full, unfiltered message stream regardless.
+      //
+      // Be aware that the OS calls the gate on whichever thread happens to be
+      // pumping the message queue. So, if your render thread is different, the
+      // gate function needs to be thread-safe.
+      //
+      // We expect the gate to not be empty. We only allow one active gate at a
+      // time, but calling this while a gate is already active will replace it
+      // atomically.
+      //
+      using gate_fn = std::function<bool (UINT msg, WPARAM wp, LPARAM lp)>;
+
+      void
+      set_message_gate (gate_fn gate);
+
+      // Remove the active message gate, if we have one.
+      //
+      // Once this returns, we guarantee there will be no further bleeding
+      // invocations of the previously installed gate. And yes, it is perfectly
+      // safe to call this even when no gate is currently active.
+      //
+      void
+      clear_message_gate () noexcept;
+
+      // Return the HWND we have subclassed for input forwarding.
+      //
+      // Note that this handle remains valid for the entire lifetime of the
+      // imgui_renderer instance.
+      //
+      HWND
+      window () const noexcept;
+
     private:
+      friend class imgui_viewport;
+
+      using pre_frame_dispatcher_t =
+        detail::event_dispatcher<std::function<void (IDirect3DDevice9&)>>;
+
       using frame_dispatcher_t =
         detail::event_dispatcher<std::function<void ()>>;
 
@@ -179,6 +244,16 @@ namespace d3d9
       float mouse_x_;
       float mouse_y_;
 
+      // Message gate and its guard mutex.
+      //
+      // The mutex serialises set_message_gate / clear_message_gate against
+      // concurrent message delivery. We snapshot the gate under the lock and
+      // invoke it outside to avoid holding the mutex across arbitrary user code.
+      //
+      gate_fn    gate_;
+      std::mutex gate_mtx_;
+
+
       // The subscriptions to the underlying device events. We store them as
       // members so they are cancelled automatically upon destruction, even if
       // the destructor body is bypassed.
@@ -189,7 +264,14 @@ namespace d3d9
 
       // The event dispatcher for the frame subscribers.
       //
+      pre_frame_dispatcher_t pre_frame_disp_;
       frame_dispatcher_t frame_disp_;
     };
+
+    inline HWND
+    imgui_renderer::window () const noexcept
+    {
+      return window_;
+    }
   }
 }

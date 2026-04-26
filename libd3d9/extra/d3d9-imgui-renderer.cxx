@@ -347,6 +347,17 @@ namespace d3d9
     // Subscription API.
     //
     subscription_token
+    imgui_renderer::on_pre_frame (std::function<void (IDirect3DDevice9&)> cb)
+    {
+      assert (cb && "cb must not be empty");
+
+      const auto i (pre_frame_disp_.subscribe (std::move (cb)));
+      auto* p (&pre_frame_disp_);
+
+      return subscription_token::make ([p, i] { p->unsubscribe (i); });
+    }
+
+    subscription_token
     imgui_renderer::on_frame (std::function<void ()> cb)
     {
       assert (cb && "cb must not be empty");
@@ -355,6 +366,44 @@ namespace d3d9
       auto* p (&frame_disp_);
 
       return subscription_token::make ([p, i] { p->unsubscribe (i); });
+    }
+
+    // Message gate API.
+    //
+    // Note that we expect the caller to pass a valid, non-empty callable. If
+    // the intention is to disable or remove the gate, they should explicitly
+    // call clear_message_gate() instead. This keeps the semantics clear and
+    // saves us from checking for or invoking an empty wrapper later in the hot
+    // path of the render loop.
+    //
+    void
+    imgui_renderer::set_message_gate (gate_fn gate)
+    {
+      assert (gate && "gate must not be empty");
+
+      // Serialize access to the gate callable. The render loop might be
+      // concurrently trying to read or execute the current gate, so we need to
+      // ensure this replacement is thread-safe and atomic relative to the
+      // invocation.
+      //
+      std::lock_guard<std::mutex> l (gate_mtx_);
+      gate_ = std::move (gate);
+    }
+
+    // Clear the currently active message gate.
+    //
+    // We mark this as noexcept since assigning nullptr (which destroys the
+    // underlying type-erased state) and releasing a mutex are non-throwing
+    // operations. If either of these somehow throws, the runtime is likely in
+    // an unrecoverable state anyway.
+    //
+    void
+    imgui_renderer::clear_message_gate () noexcept
+    {
+      // Again, serialize with the render thread before clearing.
+      //
+      std::lock_guard<std::mutex> l (gate_mtx_);
+      gate_ = nullptr;
     }
 
     // EndScene event handler. This is the main ImGui frame driver.
