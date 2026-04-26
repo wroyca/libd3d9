@@ -433,8 +433,10 @@ namespace d3d9
     // optimal trade-off for an overlay.
     //
     void
-    imgui_renderer::on_end_scene_impl (IDirect3DDevice9&)
+    imgui_renderer::on_end_scene_impl (IDirect3DDevice9& d)
     {
+      pre_frame_disp_.dispatch (d);
+
       ImGui_ImplDX9_NewFrame ();
       ImGui_ImplWin32_NewFrame ();
       ImGui::NewFrame ();
