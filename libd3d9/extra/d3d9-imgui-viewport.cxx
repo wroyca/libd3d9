@@ -189,6 +189,18 @@ namespace d3d9
       return mode_;
     }
 
+    ImGuiID
+    imgui_viewport::dockspace_id () const noexcept
+    {
+      return dockspace_id_;
+    }
+
+    const char*
+    imgui_viewport::window_name () noexcept
+    {
+      return game_window_title;
+    }
+
     // Capture the backbuffer.
     //
     // This is called at the very start of the EndScene handler, before any

@@ -99,6 +99,30 @@ namespace d3d9
       aspect_ratio_mode
       get_aspect_ratio_mode () const noexcept;
 
+      // The dockspace the captured game is docked into.
+      //
+      // Zero until the first frame has run, because the id is derived from the
+      // host window and that window is submitted from the frame callback.
+      //
+      // A host arranging its own default docking layout needs this node to
+      // split. Deriving it from the host window title and the dockspace label
+      // would make those two strings part of our interface, so we return it
+      // instead.
+      //
+      // Note that we only write this from the render thread, on the first
+      // frame, and it never changes afterwards.
+      //
+      ImGuiID
+      dockspace_id () const noexcept;
+
+      // The Dear ImGui window identifier the captured game is submitted under.
+      //
+      // A host placing the game window in a docking layout has to name it, and
+      // this is the name to pass to DockBuilderDockWindow.
+      //
+      static const char*
+      window_name () noexcept;
+
     private:
       // Pre-frame callback.
       //
